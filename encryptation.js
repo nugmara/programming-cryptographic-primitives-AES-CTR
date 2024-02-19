@@ -25,3 +25,32 @@ async function deriveKeyFromPassword(password) {
        true["encrypt", "descrypt"]
     )
 }
+
+// AES encryption
+async function encryptMessage(message, password) {
+    const encodedMessage = new TextEncoder().encode(message);
+    const encryptedData = await crypto.subtle.encrypt(
+        { name: "AES-CTR",
+          counter: new Uint8Array(16),
+          length: 128
+        },
+        password,
+        encodedMessage
+    )
+    return encryptedData
+}
+
+// AES decryption
+async function decryptMessage(encryptedData, password) {
+    const decryptedData = await crypto.subtle.decrypt(
+        {
+            name: "AES-CTR",
+            counter: new Uint8Array(16),
+            length: 128
+        },
+        password,
+        encryptedData
+    )
+    const decodedMessage = new TextDecoder().decode(decryptedData)
+    return decodedMessage;
+}
