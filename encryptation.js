@@ -39,7 +39,7 @@ async function encryptMessage(message, password) {
         password,
         encodedMessage
     )
-    return encryptedData
+    return encryptedData;
 }
 
 // AES decryption
