@@ -1,13 +1,114 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="./style.css" />
     <title>Vite App</title>
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/encryptation.js"></script>
+    <div id="app">
+      <h1>Encrypt Message</h1>
+      <input
+        type="password"
+        id="encryptPassword"
+        placeholder="Enter Password"
+      /><br />
+      <textarea id="encryptMessage" cols="50" rows="4"></textarea><br />
+      <button onClick="encrypt()">Encrypt</button><br />
+      <div id="encryptedOutput"></div>
+    </div>
+    <script>
+      async function deriveKeyFromPassword(password) {
+        const encoder = new TextEncoder();
+        const encodePassword = encoder.encode(password);
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iterations = 100000;
+        const keyLength = 256;
+
+        const key = await crypto.subtle.importKey(
+          "raw",
+          encodePassword,
+          { name: "PBKDF2" },
+          false,
+          ["deriveKey"]
+        );
+
+        return await crypto.subtle.deriveKey(
+          {
+            name: "PBKDF2",
+            salt: salt,
+            iterations: iterations,
+            hash: { name: "SHA-256" },
+          },
+          key,
+          { name: "AES-CTR", length: keyLength },
+          false,
+          ["encrypt", "decrypt"]
+        );
+      }
+
+      // AES encryption
+      async function encryptMessage(message, password) {
+        const encodedMessage = new TextEncoder().encode(message);
+        const derivedKey = await deriveKeyFromPassword(password)
+        const encryptedData = await crypto.subtle.encrypt(
+          {
+            name: "AES-CTR",
+            counter: new Uint8Array(16),
+            length: 128,
+          },
+          derivedKey,
+          encodedMessage
+        );
+        return encryptedData;
+      }
+
+      // AES encryption with Base64
+      async function encryptMessageToBase64(message, password) {
+        const encryptedData = await encryptMessage(message, password)
+        const encryptedArray = new Uint8Array(encryptedData)
+        const encryptedBase64 = arrayBufferToBase64(encryptedArray)
+        return encryptedBase64
+      }
+
+      // Auxiliar function to convert ArrayBuffer to Base64
+      function arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        return window.btoa(binary)
+      }
+
+      // AES decryption
+      async function decryptMessage(encryptedData, password) {
+        const decryptedData = await crypto.subtle.decrypt(
+          {
+            name: "AES-CTR",
+            counter: new Uint8Array(16),
+            length: 128,
+          },
+          password,
+          encryptedData
+        );
+        const decodedMessage = new TextDecoder().decode(decryptedData);
+        return decodedMessage;
+      }
+
+      // Encriptar
+      async function encrypt() {
+        const message = document.getElementById("encryptMessage").value;
+        const password = document.getElementById("encryptPassword").value;
+
+        const encryptedBase64 = await encryptMessageToBase64(message, password)
+        document.getElementById(
+          "encryptedOutput"
+        ).innerText = `Encrypted Message: ${encryptedBase64}`;
+      }
+    </script>
+    <!-- <script type="module" src="/encryptation.js"></script> -->
   </body>
 </html>
