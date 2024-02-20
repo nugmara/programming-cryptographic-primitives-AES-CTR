@@ -18,6 +18,17 @@
       <textarea id="encryptMessage" cols="50" rows="4"></textarea><br />
       <button onClick="encrypt()">Encrypt</button><br />
       <div id="encryptedOutput"></div>
+
+      <h1>Decrypt message</h1>
+      <input
+        type="password"
+        id="decryptPassword"
+        placeholder="Enter Password"
+      />
+      <br />
+      <textarea id="decryptMessage" cols="50" rows="4"></textarea><br />
+      <button onClick="decrypt()">Decrypt</button>
+      <div id="decryptedOutput"></div>
     </div>
     <script>
       async function deriveKeyFromPassword(password) {
@@ -52,7 +63,7 @@
       // AES encryption
       async function encryptMessage(message, password) {
         const encodedMessage = new TextEncoder().encode(message);
-        const derivedKey = await deriveKeyFromPassword(password)
+        const derivedKey = await deriveKeyFromPassword(password);
         const encryptedData = await crypto.subtle.encrypt(
           {
             name: "AES-CTR",
@@ -67,35 +78,55 @@
 
       // AES encryption with Base64
       async function encryptMessageToBase64(message, password) {
-        const encryptedData = await encryptMessage(message, password)
-        const encryptedArray = new Uint8Array(encryptedData)
-        const encryptedBase64 = arrayBufferToBase64(encryptedArray)
-        return encryptedBase64
+        const encryptedData = await encryptMessage(message, password);
+        const encryptedArray = new Uint8Array(encryptedData);
+        const encryptedBase64 = arrayBufferToBase64(encryptedArray);
+        return encryptedBase64;
       }
 
       // Auxiliar function to convert ArrayBuffer to Base64
       function arrayBufferToBase64(buffer) {
-        let binary = '';
+        let binary = "";
         const bytes = new Uint8Array(buffer);
         for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i])
+          binary += String.fromCharCode(bytes[i]);
         }
-        return window.btoa(binary)
+        return window.btoa(binary);
       }
 
       // AES decryption
       async function decryptMessage(encryptedData, password) {
+        const derivedKey = await deriveKeyFromPassword(password);
         const decryptedData = await crypto.subtle.decrypt(
           {
             name: "AES-CTR",
             counter: new Uint8Array(16),
             length: 128,
           },
-          password,
+          derivedKey,
           encryptedData
         );
         const decodedMessage = new TextDecoder().decode(decryptedData);
         return decodedMessage;
+      }
+
+      async function decryptMessageFromBase64(encryptedBase64, password) {
+        const encryptedArrayBuffer = base64ToArrayBuffer(encryptedBase64);
+        const decryptedMessage = await decryptMessage(
+          encryptedArrayBuffer,
+          password
+        );
+        return decryptedMessage;
+      }
+
+      // Auxiliar function to convert chain of Base64 to an ArrayBuffer
+      function base64ToArrayBuffer(base64String) {
+        const binaryString = window.atob(base64String);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
       }
 
       // Encriptar
@@ -103,10 +134,30 @@
         const message = document.getElementById("encryptMessage").value;
         const password = document.getElementById("encryptPassword").value;
 
-        const encryptedBase64 = await encryptMessageToBase64(message, password)
+        const encryptedBase64 = await encryptMessageToBase64(message, password);
         document.getElementById(
           "encryptedOutput"
         ).innerText = `Encrypted Message: ${encryptedBase64}`;
+      }
+
+      // Decriptat
+      async function decrypt() {
+        const encryptedBase64 = document.getElementById("decryptMessage").value;
+        const password = document.getElementById("decryptPassword").value;
+
+        try {
+          const decryptedMessage = await decryptMessageFromBase64(
+            encryptedBase64,
+            password
+          );
+          console.log("Decrypted Message:", decryptedMessage);
+          document.getElementById("decryptedOutput").innerText =
+            "Decrypted Message: " + JSON.stringify(decryptedMessage);
+        } catch (error) {
+          console.error("Decryption error:", error);
+          document.getElementById("decryptedOutput").innerText =
+            "Decryption failed. Please check your password.";
+        }
       }
     </script>
     <!-- <script type="module" src="/encryptation.js"></script> -->
