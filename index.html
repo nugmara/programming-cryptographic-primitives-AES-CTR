@@ -2,10 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="./style.css" />
-    <title>Vite App</title>
+    <title>Encryption App</title>
   </head>
   <body>
     <div id="app">
@@ -16,25 +14,65 @@
         placeholder="Enter Password"
       /><br />
       <textarea id="encryptMessage" cols="50" rows="4"></textarea><br />
-      <button onClick="encrypt()">Encrypt</button><br />
+      <button id="encryptButton">Encrypt</button><br />
       <div id="encryptedOutput"></div>
 
-      <h1>Decrypt message</h1>
+      <h1>Decrypt Message</h1>
       <input
         type="password"
         id="decryptPassword"
         placeholder="Enter Password"
-      />
-      <br />
+      /><br />
       <textarea id="decryptMessage" cols="50" rows="4"></textarea><br />
-      <button
-        onclick="decrypt(document.getElementById('decryptMessage').value, document.getElementById('decryptPassword').value)"
-      >
-        Decrypt
-      </button>
+      <button id="decryptButton">Decrypt</button>
       <div id="decryptedOutput"></div>
     </div>
+
     <script>
+      document.addEventListener("DOMContentLoaded", async () => {
+        const encryptButton = document.getElementById("encryptButton");
+        const decryptButton = document.getElementById("decryptButton");
+
+        encryptButton.addEventListener("click", async () => {
+          const message = document.getElementById("encryptMessage").value;
+          const password = document.getElementById("encryptPassword").value;
+
+          try {
+            const encryptedData = await encryptMessage(message, password);
+            const encryptedBase64 = arrayBufferToBase64(encryptedData);
+            console.log("Encrypted Base64:", encryptedBase64);
+            document.getElementById(
+              "encryptedOutput"
+            ).innerText = `Encoded Message: ${encryptedBase64}`;
+          } catch (error) {
+            console.error("Encryption error:", error);
+            document.getElementById("encryptedOutput").innerText =
+              "Encryption failed. Please check your input.";
+          }
+        });
+
+        decryptButton.addEventListener("click", async () => {
+          const encryptedBase64 =
+            document.getElementById("decryptMessage").value;
+          const password = document.getElementById("decryptPassword").value;
+
+          try {
+            const encryptedData = base64ToArrayBuffer(encryptedBase64);
+            const decryptedMessage = await decryptMessageFromBase64(
+              encryptedData,
+              password
+            );
+            document.getElementById(
+              "decryptedOutput"
+            ).innerText = `Decrypted Message: ${decryptedMessage}`;
+          } catch (error) {
+            console.error("Decryption error:", error);
+            document.getElementById("decryptedOutput").innerText =
+              "Decryption failed. Please check your password.";
+          }
+        });
+      });
+
       async function deriveKeyFromPassword(
         password,
         salt,
@@ -64,36 +102,6 @@
         );
       }
 
-      // AES encryption
-      async function encrypt() {
-        const message = document.getElementById("encryptMessage").value;
-        const password = document.getElementById("encryptPassword").value;
-
-        const encryptedBase64 = await encryptMessage(message, password);
-        document.getElementById(
-          "encryptedOutput"
-        ).innerText = `Encoded Message: ${encryptedBase64}`;
-      }
-
-      async function decrypt() {
-        const encryptedBase64 =
-          document.getElementById("decryptedMessage").innerText;
-        const password = document.getElementById("decryptedPassword").value;
-
-        try {
-          const decryptedMessage = await decryptMessageFromBase64(
-            encryptedBase64,
-            password
-          );
-          document.getElementById(
-            "decryptedOutput"
-          ).innerText = `Decrypted Message: ${decryptedMessage}`;
-        } catch (error) {
-          console.error("Decryption error:", error);
-          document.getElementById("decodedMessage").innerText =
-            "Decryption failed. Please check your password.";
-        }
-      }
       async function encryptMessage(message, password) {
         const encoder = new TextEncoder();
         const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -106,33 +114,61 @@
           256,
           "SHA-256"
         );
-        const counter = crypto.getRandomValues(new Uint8Array(16));
+        // const counter = crypto.getRandomValues(new Uint8Array(16));
         const encryptedData = await crypto.subtle.encrypt(
           {
             name: "AES-CTR",
-            counter: counter,
+            counter: iv,
             length: 128,
           },
           key,
           messageBuffer
         );
-        return (
-          arrayBufferToBase64(salt) +
-          arrayBufferToBase64(iv) +
-          arrayBufferToBase64(counter) +
-          arrayBufferToBase64(encryptedData)
+
+        const concatenatedData = new Uint8Array(
+          salt.byteLength + iv.byteLength + encryptedData.byteLength
         );
+        concatenatedData.set(salt);
+        concatenatedData.set(iv, salt.byteLength);
+        concatenatedData.set(encryptedData, salt.byteLength + iv.byteLength);
+
+        return concatenatedData;
+        // Concatenate all parts of the encrypted message
+        // const concatenatedData = new Uint8Array(
+        //   salt.byteLength + iv.byteLength + encryptedData.byteLength
+        // );
+        // concatenatedData.set(salt);
+        // concatenatedData.set(iv, salt.byteLength);
+        // concatenatedData.set(encryptedData, salt.byteLength + iv.byteLength);
+
+        // return arrayBufferToBase64(concatenatedData);
+        // const base64 = arrayBufferToBase64(encryptedData);
+        // console.log("Salt:", arrayBufferToBase64(salt));
+        // console.log("IV:", arrayBufferToBase64(iv));
+        // console.log("Encrypted Data:", base64);
+        // return (
+        //   arrayBufferToBase64(salt) +
+        //   arrayBufferToBase64(iv) +
+        //   arrayBufferToBase64(counter) +
+        //   base64
+        // );
       }
 
-      // AES encryption with Base64
+      async function decryptMessageFromBase64(encryptedData, password) {
+        // Verificar la validez de la cadena base64
+        // if (!validarBase64(encryptedBase64)) {
+        //   console.error("Cadena base64 no válida");
+        //   throw new Error("Cadena base64 no válida");
+        // }
+        const encoder = new TextEncoder();
+        const salt = encryptedData.slice(0, 16);
+        const iv = encryptedData.slice(16, 32);
+        const encryptedMessage = encryptedData.slice(32);
 
-      // AES decryption
-      async function decrypt(encryptedBase64, password) {
-        const salt = base64ToArrayBuffer(encryptedBase64.substring(0, 24));
-        const iv = base64ToArrayBuffer(encryptedBase64.substring(24, 48));
-        const encryptedData = base64ToArrayBuffer(
-          encryptedBase64.substring(48)
-        );
+        console.log("Salt:", arrayBufferToBase64(salt));
+        console.log("IV:", arrayBufferToBase64(iv));
+        console.log("Encrypted Data:", arrayBufferToBase64(encryptedData));
+
         const key = await deriveKeyFromPassword(
           password,
           salt,
@@ -140,17 +176,21 @@
           256,
           "SHA-256"
         );
-        const decryptedData = await crypto.subtle.decrypt(
+        const decryptedMessage = await crypto.subtle.decrypt(
           {
             name: "AES-CTR",
-            counter: new Uint8Array(iv),
-            iv: new Uint8Array(iv),
+            counter: iv,
             length: 128,
           },
           key,
-          encryptedData
+          encryptedMessage
         );
-        return new TextDecoder().decode(decryptedData);
+
+        console.log("Decrypted Data (Buffer):", decryptedData);
+        const decryptedString = new TextDecoder().decode(decryptedMessage);
+        console.log("Decrypted Data:", decryptedString);
+
+        return decryptedString;
       }
 
       function arrayBufferToBase64(buffer) {
@@ -163,19 +203,38 @@
       }
 
       function base64ToArrayBuffer(base64String) {
+        const binaryString = window.atob(base64String);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      }
+
+      function validarBase64(base64String) {
+        // Verificar longitud
+        if (base64String.length % 4 !== 0) {
+          console.error("Longitud de cadena no válida");
+          return false;
+        }
+
+        // Verificar caracteres válidos
+        const validCharacters = /^[A-Za-z0-9+/]+={0,2}$/;
+        if (!validCharacters.test(base64String)) {
+          console.error("Cadena contiene caracteres no válidos");
+          return false;
+        }
+
+        // Intentar decodificar
         try {
-          const binaryString = window.atob(base64String);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          return bytes.buffer;
+          const decodedString = atob(base64String);
+          console.log("Decodificación exitosa:", decodedString);
+          return true;
         } catch (error) {
-          console.error("Error decoding base64 string:", error);
-          return null;
+          console.error("Error al decodificar:", error);
+          return false;
         }
       }
     </script>
-    <!-- <script type="module" src="/encryptation.js"></script> -->
   </body>
 </html>
