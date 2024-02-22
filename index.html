@@ -29,13 +29,19 @@
     </div>
 
     <script>
-      const base64ToUInt8Array = b64 =>
-        Uint8Array.from(window.atob(b64), c => c.charCodeAt(0));
-      const textToUInt8Array = s => new TextEncoder().encode(s);
-      const UInt8ArrayToString = u8 => String.fromCharCode.apply(null, u8);
-      const UInt8ArrayToBase64 = u8 => window.btoa(UInt8ArrayToString(u8));
+      const base64ToUInt8Array = (b64) =>
+        Uint8Array.from(window.atob(b64), (c) => c.charCodeAt(0));
+      const textToUInt8Array = (s) => new TextEncoder().encode(s);
+      const UInt8ArrayToString = (u8) => String.fromCharCode.apply(null, u8);
+      const UInt8ArrayToBase64 = (u8) => window.btoa(UInt8ArrayToString(u8));
 
-      async function deriveKeyFromPassword(password, salt, iterations, keyLength, hash) {
+      async function deriveKeyFromPassword(
+        password,
+        salt,
+        iterations,
+        keyLength,
+        hash
+      ) {
         const encoder = new TextEncoder();
         let keyMaterial = await crypto.subtle.importKey(
           "raw",
@@ -73,20 +79,20 @@
             {
               name: "AES-CTR",
               counter: iv,
-              length: 128
+              length: 128,
             },
             key,
             textToUInt8Array(message)
           )
         );
-        
+
         // Concatenate IV and ciphertext into a single base64-encoded string
-    const encodedMessage = UInt8ArrayToBase64(iv) + ':' + UInt8ArrayToBase64(ciphertext);
+        const encodedMessage =
+          UInt8ArrayToBase64(iv) + ":" + UInt8ArrayToBase64(ciphertext);
 
         return encodedMessage;
       }
 
-      
       async function decryptMessageFromBase64(encryptedData, password) {
         const key = await deriveKeyFromPassword(
           password,
@@ -96,16 +102,16 @@
           "SHA-256"
         );
 
-        const parts = encryptedData.split(":")
-        const iv = base64ToUInt8Array(parts[0])
-        const ciphertext = base64ToUInt8Array(parts[1])
+        const parts = encryptedData.split(":");
+        const iv = base64ToUInt8Array(parts[0]);
+        const ciphertext = base64ToUInt8Array(parts[1]);
         const plaintext = UInt8ArrayToString(
           new Uint8Array(
             await window.crypto.subtle.decrypt(
               {
                 name: "AES-CTR",
                 counter: iv,
-                length: 128
+                length: 128,
               },
               key,
               ciphertext
@@ -126,9 +132,11 @@
           try {
             const encryptedData = await encryptMessage(message, password);
             console.log("Encrypted Data:", encryptedData);
-            document.getElementById(
-              "encryptedOutput"
-            ).innerText = `Encoded Message: ${JSON.stringify(encryptedData)}`;
+            document.getElementById("encryptedOutput").innerText =
+              `Encoded Message: ${JSON.stringify(encryptedData)}`.replace(
+                /"/g,
+                ""
+              );
           } catch (error) {
             console.error("Encryption error:", error);
             document.getElementById("encryptedOutput").innerText =
@@ -137,7 +145,7 @@
         });
 
         decryptButton.addEventListener("click", async () => {
-          const encryptedData =document.getElementById("decryptMessage").value
+          const encryptedData = document.getElementById("decryptMessage").value;
           const password = document.getElementById("decryptPassword").value;
 
           try {
