@@ -27,33 +27,37 @@
       />
       <br />
       <textarea id="decryptMessage" cols="50" rows="4"></textarea><br />
-      <button onClick="decrypt()">Decrypt</button>
+      <button
+        onclick="decrypt(document.getElementById('decryptMessage').value, document.getElementById('decryptPassword').value)"
+      >
+        Decrypt
+      </button>
       <div id="decryptedOutput"></div>
     </div>
     <script>
-      async function deriveKeyFromPassword(password) {
+      async function deriveKeyFromPassword(
+        password,
+        salt,
+        iterations,
+        keyLength,
+        hash
+      ) {
         const encoder = new TextEncoder();
-        const encodePassword = encoder.encode(password);
-        const salt = crypto.getRandomValues(new Uint8Array(16));
-        const iterations = 100000;
-        const keyLength = 256;
-
-        const key = await crypto.subtle.importKey(
+        let keyMaterial = await crypto.subtle.importKey(
           "raw",
-          encodePassword,
+          encoder.encode(password),
           { name: "PBKDF2" },
           false,
           ["deriveKey"]
         );
-
         return await crypto.subtle.deriveKey(
           {
             name: "PBKDF2",
-            salt: salt,
+            salt: encoder.encode(salt),
             iterations: iterations,
-            hash: { name: "SHA-256" },
+            hash: hash,
           },
-          key,
+          keyMaterial,
           { name: "AES-CTR", length: keyLength },
           false,
           ["encrypt", "decrypt"]
@@ -61,30 +65,94 @@
       }
 
       // AES encryption
+      async function encrypt() {
+        const message = document.getElementById("encryptMessage").value;
+        const password = document.getElementById("encryptPassword").value;
+
+        const encryptedBase64 = await encryptMessage(message, password);
+        document.getElementById(
+          "encryptedOutput"
+        ).innerText = `Encoded Message: ${encryptedBase64}`;
+      }
+
+      async function decrypt() {
+        const encryptedBase64 =
+          document.getElementById("decryptedMessage").innerText;
+        const password = document.getElementById("decryptedPassword").value;
+
+        try {
+          const decryptedMessage = await decryptMessageFromBase64(
+            encryptedBase64,
+            password
+          );
+          document.getElementById(
+            "decryptedOutput"
+          ).innerText = `Decrypted Message: ${decryptedMessage}`;
+        } catch (error) {
+          console.error("Decryption error:", error);
+          document.getElementById("decodedMessage").innerText =
+            "Decryption failed. Please check your password.";
+        }
+      }
       async function encryptMessage(message, password) {
-        const encodedMessage = new TextEncoder().encode(message);
-        const derivedKey = await deriveKeyFromPassword(password);
+        const encoder = new TextEncoder();
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iv = crypto.getRandomValues(new Uint8Array(16));
+        const messageBuffer = encoder.encode(message);
+        const key = await deriveKeyFromPassword(
+          password,
+          salt,
+          100000,
+          256,
+          "SHA-256"
+        );
+        const counter = crypto.getRandomValues(new Uint8Array(16));
         const encryptedData = await crypto.subtle.encrypt(
           {
             name: "AES-CTR",
-            counter: new Uint8Array(16),
+            counter: counter,
             length: 128,
           },
-          derivedKey,
-          encodedMessage
+          key,
+          messageBuffer
         );
-        return encryptedData;
+        return (
+          arrayBufferToBase64(salt) +
+          arrayBufferToBase64(iv) +
+          arrayBufferToBase64(counter) +
+          arrayBufferToBase64(encryptedData)
+        );
       }
 
       // AES encryption with Base64
-      async function encryptMessageToBase64(message, password) {
-        const encryptedData = await encryptMessage(message, password);
-        const encryptedArray = new Uint8Array(encryptedData);
-        const encryptedBase64 = arrayBufferToBase64(encryptedArray);
-        return encryptedBase64;
+
+      // AES decryption
+      async function decrypt(encryptedBase64, password) {
+        const salt = base64ToArrayBuffer(encryptedBase64.substring(0, 24));
+        const iv = base64ToArrayBuffer(encryptedBase64.substring(24, 48));
+        const encryptedData = base64ToArrayBuffer(
+          encryptedBase64.substring(48)
+        );
+        const key = await deriveKeyFromPassword(
+          password,
+          salt,
+          100000,
+          256,
+          "SHA-256"
+        );
+        const decryptedData = await crypto.subtle.decrypt(
+          {
+            name: "AES-CTR",
+            counter: new Uint8Array(iv),
+            iv: new Uint8Array(iv),
+            length: 128,
+          },
+          key,
+          encryptedData
+        );
+        return new TextDecoder().decode(decryptedData);
       }
 
-      // Auxiliar function to convert ArrayBuffer to Base64
       function arrayBufferToBase64(buffer) {
         let binary = "";
         const bytes = new Uint8Array(buffer);
@@ -94,69 +162,17 @@
         return window.btoa(binary);
       }
 
-      // AES decryption
-      async function decryptMessage(encryptedData, password) {
-        const derivedKey = await deriveKeyFromPassword(password);
-        const decryptedData = await crypto.subtle.decrypt(
-          {
-            name: "AES-CTR",
-            counter: new Uint8Array(16),
-            length: 128,
-          },
-          derivedKey,
-          encryptedData
-        );
-        const decodedMessage = new TextDecoder().decode(decryptedData);
-        return decodedMessage;
-      }
-
-      async function decryptMessageFromBase64(encryptedBase64, password) {
-        const encryptedArrayBuffer = base64ToArrayBuffer(encryptedBase64);
-        const decryptedMessage = await decryptMessage(
-          encryptedArrayBuffer,
-          password
-        );
-        return decryptedMessage;
-      }
-
-      // Auxiliar function to convert chain of Base64 to an ArrayBuffer
       function base64ToArrayBuffer(base64String) {
-        const binaryString = window.atob(base64String);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        return bytes.buffer;
-      }
-
-      // Encriptar
-      async function encrypt() {
-        const message = document.getElementById("encryptMessage").value;
-        const password = document.getElementById("encryptPassword").value;
-
-        const encryptedBase64 = await encryptMessageToBase64(message, password);
-        document.getElementById(
-          "encryptedOutput"
-        ).innerText = `Encrypted Message: ${encryptedBase64}`;
-      }
-
-      // Decriptat
-      async function decrypt() {
-        const encryptedBase64 = document.getElementById("decryptMessage").value;
-        const password = document.getElementById("decryptPassword").value;
-
         try {
-          const decryptedMessage = await decryptMessageFromBase64(
-            encryptedBase64,
-            password
-          );
-          console.log("Decrypted Message:", decryptedMessage);
-          document.getElementById("decryptedOutput").innerText =
-            "Decrypted Message: " + JSON.stringify(decryptedMessage);
+          const binaryString = window.atob(base64String);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          return bytes.buffer;
         } catch (error) {
-          console.error("Decryption error:", error);
-          document.getElementById("decryptedOutput").innerText =
-            "Decryption failed. Please check your password.";
+          console.error("Error decoding base64 string:", error);
+          return null;
         }
       }
     </script>
