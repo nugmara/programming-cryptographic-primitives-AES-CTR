@@ -7,6 +7,8 @@
   </head>
   <body>
     <div id="app">
+      <input type="file" id="fileInput" accept=".bin" />
+      <div id="decryptedOutput"></div>
       <h1>Encrypt Message</h1>
       <input
         type="password"
@@ -17,7 +19,7 @@
       <button id="encryptButton">Encrypt</button><br />
       <div id="encryptedOutput"></div>
 
-      <h1>Decrypt Message</h1>
+      <!-- <h1>Decrypt Message</h1>
       <input
         type="password"
         id="decryptPassword"
@@ -25,15 +27,91 @@
       /><br />
       <textarea id="decryptMessage" cols="50" rows="4"></textarea><br />
       <button id="decryptButton">Decrypt</button>
-      <div id="decryptedOutput"></div>
+      <div id="decryptedOutput"></div> -->
     </div>
 
     <script>
-      const base64ToUInt8Array = (b64) =>
-        Uint8Array.from(window.atob(b64), (c) => c.charCodeAt(0));
-      const textToUInt8Array = (s) => new TextEncoder().encode(s);
-      const UInt8ArrayToString = (u8) => String.fromCharCode.apply(null, u8);
-      const UInt8ArrayToBase64 = (u8) => window.btoa(UInt8ArrayToString(u8));
+     const base64ToUInt8Array = (b64) =>
+         Uint8Array.from(window.atob(b64), (c) => c.charCodeAt(0));
+       const textToUInt8Array = (s) => new TextEncoder().encode(s);
+       const Unt8ArrayToString = (u8) => String.fromCharCode.apply(null, u8);
+       const UInt8ArrayToBase64 = (u8) => window.btoa(UInt8ArrayToString(u8)); 
+      async function encryptMessage(message, password) {
+        const key = await deriveKeyFromPassword(
+          password,
+          "HT24EFLxzRYATTG4PwMstxuIc6cnfnr4VjIeSJc9SMQ=",
+          100000,
+          256,
+          "SHA-256"
+        );
+
+        const iv = window.crypto.getRandomValues(new Uint8Array(16));
+        const ciphertext = new Uint8Array(
+          await window.crypto.subtle.encrypt(
+            {
+              name: "AES-CTR",
+              counter: iv,
+              length: 128,
+            },
+            key,
+            textToUInt8Array(message)
+          )
+        );
+
+        const encryptedData = new Uint8Array(iv.length + ciphertext.length);
+        encryptedData.set(iv);
+        encryptedData.set(ciphertext, iv.length);
+
+        return encryptedData;
+      }
+      async function decryptMessageFromBinary(encryptedData, password) {
+        const key = await deriveKeyFromPassword(
+          password,
+          "HT24EFLxzRYATTG4PwMstxuIc6cnfnr4VjIeSJc9SMQ=",
+          100000,
+          256,
+          "SHA-256"
+        );
+
+        const iv = encryptedData.slice(0, 16);
+        const ciphertext = encryptedData.slice(16);
+        const decryptedBuffer = await window.crypto.subtle.decrypt(
+          {
+            name: "AES-CTR",
+            counter: iv,
+            length: 128,
+          },
+          key,
+          ciphertext
+        );
+
+        const decryptedMessage = new TextDecoder().decode(decryptedBuffer)
+        return decryptedMessage;
+      }
+      // document
+      //   .getElementById("fileInput")
+      //   .addEventListener("change", async (event) => {
+      //     const file = event.target.files[0];
+      //     const decryptedMessage = await readFileAsArrayBuffer(file);
+      //     document.getElementById(
+      //       "decryptedOutput"
+      //     ).innerText = `Decrypted Message: ${decryptedMessage}`;
+      //   });
+
+      // async function readFileAsArrayBuffer(file) {
+      //   return new Promise((resolve, reject) => {
+      //     const reader = new FileReader();
+      //     reader.onload = () => resolve(reader.result);
+      //     reader.onerror = reject;
+      //     reader.readAsArrayBuffer(file);
+      //   });
+      // }
+
+      // const base64ToUInt8Array = (b64) =>
+      //   Uint8Array.from(window.atob(b64), (c) => c.charCodeAt(0));
+      // const textToUInt8Array = (s) => new TextEncoder().encode(s);
+      // const UInt8ArrayToString = (u8) => String.fromCharCode.apply(null, u8);
+      // const UInt8ArrayToBase64 = (u8) => window.btoa(UInt8ArrayToString(u8));
 
       async function deriveKeyFromPassword(
         password,
@@ -64,66 +142,11 @@
         );
       }
 
-      async function encryptMessage(message, password) {
-        const key = await deriveKeyFromPassword(
-          password,
-          "HT24EFLxzRYATTG4PwMstxuIc6cnfnr4VjIeSJc9SMQ=",
-          100000,
-          256,
-          "SHA-256"
-        );
 
-        const iv = window.crypto.getRandomValues(new Uint8Array(16));
-        const ciphertext = new Uint8Array(
-          await window.crypto.subtle.encrypt(
-            {
-              name: "AES-CTR",
-              counter: iv,
-              length: 128,
-            },
-            key,
-            textToUInt8Array(message)
-          )
-        );
-
-        // Concatenate IV and ciphertext into a single base64-encoded string
-        const encodedMessage =
-          UInt8ArrayToBase64(iv) + ":" + UInt8ArrayToBase64(ciphertext);
-
-        return encodedMessage;
-      }
-
-      async function decryptMessageFromBase64(encryptedData, password) {
-        const key = await deriveKeyFromPassword(
-          password,
-          "HT24EFLxzRYATTG4PwMstxuIc6cnfnr4VjIeSJc9SMQ=",
-          100000,
-          256,
-          "SHA-256"
-        );
-
-        const parts = encryptedData.split(":");
-        const iv = base64ToUInt8Array(parts[0]);
-        const ciphertext = base64ToUInt8Array(parts[1]);
-        const plaintext = UInt8ArrayToString(
-          new Uint8Array(
-            await window.crypto.subtle.decrypt(
-              {
-                name: "AES-CTR",
-                counter: iv,
-                length: 128,
-              },
-              key,
-              ciphertext
-            )
-          )
-        );
-        return plaintext;
-      }
 
       document.addEventListener("DOMContentLoaded", async () => {
         const encryptButton = document.getElementById("encryptButton");
-        const decryptButton = document.getElementById("decryptButton");
+        // const decryptButton = document.getElementById("decryptButton");
 
         encryptButton.addEventListener("click", async () => {
           const message = document.getElementById("encryptMessage").value;
@@ -132,11 +155,15 @@
           try {
             const encryptedData = await encryptMessage(message, password);
             console.log("Encrypted Data:", encryptedData);
+            const blob = new Blob([encryptedData]);
+            saveAs(blob, "encrypted_message.bin");
             document.getElementById("encryptedOutput").innerText =
-              `Encoded Message: ${JSON.stringify(encryptedData)}`.replace(
-                /"/g,
-                ""
-              );
+          "Message encrypted and saved as 'encrypted_message.bin'";
+            // document.getElementById("encryptedOutput").innerText =
+            //   `Encoded Message: ${JSON.stringify(encryptedData)}`.replace(
+            //     /"/g,
+            //     ""
+            //   );
           } catch (error) {
             console.error("Encryption error:", error);
             document.getElementById("encryptedOutput").innerText =
@@ -144,25 +171,53 @@
           }
         });
 
-        decryptButton.addEventListener("click", async () => {
-          const encryptedData = document.getElementById("decryptMessage").value;
-          const password = document.getElementById("decryptPassword").value;
+        // decryptButton.addEventListener("click", async () => {
+        //   const fileInput = document.getElementById("fileInput");
+        //   const file = fileInput.files[0];
+        //   const password = document.getElementById("decryptPassword").value;
 
-          try {
-            const decryptedMessage = await decryptMessageFromBase64(
-              encryptedData,
-              password
-            );
-            document.getElementById(
-              "decryptedOutput"
-            ).innerText = `Decrypted Message: ${decryptedMessage}`;
-          } catch (error) {
-            console.error("Decryption error:", error);
-            document.getElementById("decryptedOutput").innerText =
-              "Decryption failed. Please check your password.";
-          }
-        });
+        //   try {
+        //     const encryptedData = await readFileAsArrayBuffer(file);
+        //     const decryptedMessage = await decryptMessageFromBinary(
+        //       encryptedData,
+        //       password
+        //     );
+        //     document.getElementById(
+        //       "decryptedOutput"
+        //     ).innerText = `Decrypted Message: ${decryptedMessage}`;
+        //   } catch (error) {
+        //     console.error("Decryption error:", error);
+        //     document.getElementById("decryptedOutput").innerText =
+        //       "Decryption failed. Please check your password.";
+        //   }
+        // });
+        document.getElementById("fileInput").addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+
+      reader.onload = async () => {
+        const encryptedData = new Uint8Array(reader.result);
+        const password = prompt("Enter password for decryption:");
+
+        try {
+          const decryptedMessage = await decryptMessageFromBinary(
+            encryptedData,
+            password
+          );
+          document.getElementById(
+            "decryptedOutput"
+          ).innerText = `Decrypted Message: ${decryptedMessage}`;
+        } catch (error) {
+          console.error("Decryption error:", error);
+          document.getElementById("decryptedOutput").innerText =
+            "Decryption failed. Please check your password.";
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
       });
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
   </body>
 </html>
