@@ -10,6 +10,12 @@
       <input type="file" id="fileInput" accept=".bin" />
       <div id="decryptedOutput"></div>
       <h1>Encrypt Message</h1>
+      <h4>Random Password Generator</h4>
+      <div>
+        <label for="password">Random Password:</label>
+        <input type="text" id="password" readonly />
+        <button id="generateButton">Generate Password</button>
+      </div>
       <input
         type="password"
         id="encryptPassword"
@@ -18,24 +24,32 @@
       <textarea id="encryptMessage" cols="50" rows="4"></textarea><br />
       <button id="encryptButton">Encrypt</button><br />
       <div id="encryptedOutput"></div>
-
-      <!-- <h1>Decrypt Message</h1>
-      <input
-        type="password"
-        id="decryptPassword"
-        placeholder="Enter Password"
-      /><br />
-      <textarea id="decryptMessage" cols="50" rows="4"></textarea><br />
-      <button id="decryptButton">Decrypt</button>
-      <div id="decryptedOutput"></div> -->
     </div>
 
     <script>
-     const base64ToUInt8Array = (b64) =>
-         Uint8Array.from(window.atob(b64), (c) => c.charCodeAt(0));
-       const textToUInt8Array = (s) => new TextEncoder().encode(s);
-       const Unt8ArrayToString = (u8) => String.fromCharCode.apply(null, u8);
-       const UInt8ArrayToBase64 = (u8) => window.btoa(UInt8ArrayToString(u8)); 
+      function generateRandomPassword(length) {
+        const charset =
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        let password = "";
+        for (let i = 0; i < length; i++) {
+          const randomIndex = Math.floor(Math.random() * charset.length);
+          password += charset[randomIndex];
+        }
+        return password;
+      }
+
+      document
+        .getElementById("generateButton")
+        .addEventListener("click", () => {
+          const passwordInput = document.getElementById("password");
+          const randomPassword = generateRandomPassword(16); // Generar una contraseña de 16 caracteres
+          passwordInput.value = randomPassword;
+        });
+      const base64ToUInt8Array = (b64) =>
+        Uint8Array.from(window.atob(b64), (c) => c.charCodeAt(0));
+      const textToUInt8Array = (s) => new TextEncoder().encode(s);
+      const Unt8ArrayToString = (u8) => String.fromCharCode.apply(null, u8);
+      const UInt8ArrayToBase64 = (u8) => window.btoa(UInt8ArrayToString(u8));
       async function encryptMessage(message, password) {
         const key = await deriveKeyFromPassword(
           password,
@@ -85,33 +99,9 @@
           ciphertext
         );
 
-        const decryptedMessage = new TextDecoder().decode(decryptedBuffer)
+        const decryptedMessage = new TextDecoder().decode(decryptedBuffer);
         return decryptedMessage;
       }
-      // document
-      //   .getElementById("fileInput")
-      //   .addEventListener("change", async (event) => {
-      //     const file = event.target.files[0];
-      //     const decryptedMessage = await readFileAsArrayBuffer(file);
-      //     document.getElementById(
-      //       "decryptedOutput"
-      //     ).innerText = `Decrypted Message: ${decryptedMessage}`;
-      //   });
-
-      // async function readFileAsArrayBuffer(file) {
-      //   return new Promise((resolve, reject) => {
-      //     const reader = new FileReader();
-      //     reader.onload = () => resolve(reader.result);
-      //     reader.onerror = reject;
-      //     reader.readAsArrayBuffer(file);
-      //   });
-      // }
-
-      // const base64ToUInt8Array = (b64) =>
-      //   Uint8Array.from(window.atob(b64), (c) => c.charCodeAt(0));
-      // const textToUInt8Array = (s) => new TextEncoder().encode(s);
-      // const UInt8ArrayToString = (u8) => String.fromCharCode.apply(null, u8);
-      // const UInt8ArrayToBase64 = (u8) => window.btoa(UInt8ArrayToString(u8));
 
       async function deriveKeyFromPassword(
         password,
@@ -142,7 +132,9 @@
         );
       }
 
-
+      // Uso: genera una contraseña aleatoria de 16 caracteres
+      const randomPassword = generateRandomPassword(16);
+      console.log("Contraseña aleatoria:", randomPassword);
 
       document.addEventListener("DOMContentLoaded", async () => {
         const encryptButton = document.getElementById("encryptButton");
@@ -158,7 +150,7 @@
             const blob = new Blob([encryptedData]);
             saveAs(blob, "encrypted_message.bin");
             document.getElementById("encryptedOutput").innerText =
-          "Message encrypted and saved as 'encrypted_message.bin'";
+              "Message encrypted and saved as 'encrypted_message.bin'";
             // document.getElementById("encryptedOutput").innerText =
             //   `Encoded Message: ${JSON.stringify(encryptedData)}`.replace(
             //     /"/g,
@@ -191,31 +183,33 @@
         //       "Decryption failed. Please check your password.";
         //   }
         // });
-        document.getElementById("fileInput").addEventListener("change", async (event) => {
-      const file = event.target.files[0];
-      const reader = new FileReader();
+        document
+          .getElementById("fileInput")
+          .addEventListener("change", async (event) => {
+            const file = event.target.files[0];
+            const reader = new FileReader();
 
-      reader.onload = async () => {
-        const encryptedData = new Uint8Array(reader.result);
-        const password = prompt("Enter password for decryption:");
+            reader.onload = async () => {
+              const encryptedData = new Uint8Array(reader.result);
+              const password = prompt("Enter password for decryption:");
 
-        try {
-          const decryptedMessage = await decryptMessageFromBinary(
-            encryptedData,
-            password
-          );
-          document.getElementById(
-            "decryptedOutput"
-          ).innerText = `Decrypted Message: ${decryptedMessage}`;
-        } catch (error) {
-          console.error("Decryption error:", error);
-          document.getElementById("decryptedOutput").innerText =
-            "Decryption failed. Please check your password.";
-        }
-      };
+              try {
+                const decryptedMessage = await decryptMessageFromBinary(
+                  encryptedData,
+                  password
+                );
+                document.getElementById(
+                  "decryptedOutput"
+                ).innerText = `Decrypted Message: ${decryptedMessage}`;
+              } catch (error) {
+                console.error("Decryption error:", error);
+                document.getElementById("decryptedOutput").innerText =
+                  "Decryption failed. Please check your password.";
+              }
+            };
 
-      reader.readAsArrayBuffer(file);
-    });
+            reader.readAsArrayBuffer(file);
+          });
       });
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
